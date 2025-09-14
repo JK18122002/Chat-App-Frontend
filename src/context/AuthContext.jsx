@@ -3,7 +3,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import { io } from 'socket.io-client'
 
-const backendUrl = import.meta.env.URL
+const backendUrl = import.meta.env.url
 axios.defaults.baseURL = backendUrl
 
 export const AuthContext = createContext()
