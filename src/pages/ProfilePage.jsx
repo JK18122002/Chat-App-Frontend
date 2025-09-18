@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react'
+import React, { useState, useEffect, useContext, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import assets from '../assets/assets'
 import { AuthContext } from '../context/AuthContext'
@@ -11,9 +11,18 @@ const ProfilePage = () => {
   const [name, setName] = useState(authUser?.fullName || '')
   const [bio, setBio] = useState(authUser?.bio || '')
   const [loading, setLoading] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false) // 🔔 Confirmation dialog
   const navigate = useNavigate()
+  const panelRef = useRef(null)
 
-  // 🔄 Sync state when authUser changes
+  // Store initial values to detect unsaved changes
+  const initialData = {
+    profilePic: authUser?.profilePic || '',
+    fullName: authUser?.fullName || '',
+    bio: authUser?.bio || '',
+  }
+
+  // Sync state when authUser changes
   useEffect(() => {
     if (authUser) {
       setName(authUser.fullName || '')
@@ -22,7 +31,7 @@ const ProfilePage = () => {
     }
   }, [authUser])
 
-  // 🖼️ Preview selected image
+  // Preview selected image
   useEffect(() => {
     if (!selectedImg) return
     const objectUrl = URL.createObjectURL(selectedImg)
@@ -30,7 +39,33 @@ const ProfilePage = () => {
     return () => URL.revokeObjectURL(objectUrl)
   }, [selectedImg])
 
-  // 📦 Convert file to base64
+  // Check for unsaved changes
+  const hasUnsavedChanges = () => {
+    return (
+      name.trim() !== (authUser?.fullName || '') ||
+      bio.trim() !== (authUser?.bio || '') ||
+      (selectedImg !== null)
+    )
+  }
+
+  // Click outside to close with confirmation
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) {
+        if (hasUnsavedChanges()) {
+          setShowConfirm(true)
+        } else {
+          navigate('/')
+        }
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [navigate, name, bio, selectedImg])
+
+  // Convert file to base64
   const fileToBase64 = (file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -56,7 +91,7 @@ const ProfilePage = () => {
         bio: bio.trim(),
       })
 
-      navigate('/') // ✅ redirect after saving
+      navigate('/') // redirect after saving
     } catch (err) {
       console.error('Profile update error:', err)
     } finally {
@@ -64,9 +99,27 @@ const ProfilePage = () => {
     }
   }
 
+  // Handle confirmed exit
+  const confirmExit = () => navigate('/')
+  const cancelExit = () => setShowConfirm(false)
+
   return (
-    <div className="min-h-screen bg-cover bg-no-repeat flex items-center justify-center">
-      <div className="w-5/6 max-w-2xl backdrop-blur-2xl text-gray-300 border-2 border-gray-600 flex items-center justify-between max-sm:flex-col-reverse rounded-lg">
+    <div className="min-h-screen bg-cover bg-no-repeat flex items-center justify-center relative">
+      <div
+        ref={panelRef}
+        className="w-5/6 max-w-2xl backdrop-blur-2xl text-gray-300 border-2 border-gray-600 flex items-center justify-between max-sm:flex-col-reverse rounded-lg relative"
+      >
+        {/* Close Button */}
+        <button
+          onClick={() => {
+            if (hasUnsavedChanges()) setShowConfirm(true)
+            else navigate('/')
+          }}
+          className="absolute top-3 right-3 text-gray-300 hover:text-white text-xl font-bold"
+        >
+          ×
+        </button>
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-5 p-10 flex-1">
           <h3 className="text-lg font-semibold">Profile details</h3>
 
@@ -127,6 +180,29 @@ const ProfilePage = () => {
           className="max-w-44 aspect-square rounded-full mx-10 max-sm:mt-10 object-cover"
         />
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-6 rounded-lg text-gray-200 max-w-sm w-full flex flex-col gap-4">
+            <p>Are you sure you want to exit without saving changes?</p>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={cancelExit}
+                className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmExit}
+                className="px-4 py-2 bg-red-600 rounded hover:bg-red-500"
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
